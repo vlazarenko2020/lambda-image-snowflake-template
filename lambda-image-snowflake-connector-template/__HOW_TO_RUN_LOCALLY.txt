@@ -1,0 +1,129 @@
+HOW TO RUN LOCALLY
+==================
+
+What it does
+------------
+main-1.py calls lambda_handler("", ""), which connects to Snowflake and prints the
+first 10 rows of <SNOW_DATABASE>.<SNOW_SCHEMA>.customers
+(defaults: BR_DB.BR_ORDERS.customers).
+
+Call flow: main-1.py -> lambda_function.lambda_handler
+           -> Modules/Layer_1.py: f_connect_to_snow(), f_run_snowflake_sql()
+Settings are read in z_config.py from environment variables.
+
+
+PREREQUISITES
+-------------
+1. uv installed (https://docs.astral.sh/uv/). Python 3.14 is picked up from
+   .python-version and the dependencies from uv.lock; nothing else to install:
+
+       uv sync
+
+2. A named Snowflake connection in ~/.snowflake/connections.toml
+   (the file used by the 'snow' CLI). Example section for key-pair login:
+
+       [<<your-snowflake-connection-name>>]
+       account = "<org>-<account>"
+       user = "<USER>"
+       authenticator = "SNOWFLAKE_JWT"
+       private_key_path = "/path/to/rsa_key.p8"
+       warehouse = "COMPUTE_WH"
+       role = "SYSADMIN"
+
+   Create or check it with:
+
+       snow connection add
+       snow connection list
+       snow connection test -c <<your-snowflake-connection-name>>
+
+   The code reads 'private_key_path' from this file and passes it to the Python
+   connector as 'private_key_file' (the connector does not understand the
+   'private_key_path' name on its own).
+
+3. If the private key is encrypted, export the passphrase in your shell.
+   Either variable works (checked in this order):
+
+       export PRIVATE_KEY_PASSPHRASE='...'
+       export SNOWSQL_PRIVATE_KEY_PASSPHRASE='...'
+
+   Put it in ~/.bashrc or a password manager. Do NOT put it in this project,
+   in connections.toml, or in a script. If the key is not encrypted, skip this.
+
+4. The Snowflake role in the connection must be able to SELECT from the table
+   (and USAGE on the database, schema and warehouse).
+
+
+RUN
+---
+   ./main-0.sh
+
+main-0.sh does 'uv run main-1.py'. It needs SNOW_CONNECTION already exported in
+your shell, for example by adding this line to ~/.bashrc (then open a new terminal):
+
+   export SNOW_CONNECTION="<<your-snowflake-connection-name>>"
+
+To use another profile or another database/schema for one run:
+
+   SNOW_CONNECTION=my_other_profile ./main-0.sh
+   SNOW_DATABASE=AIRFLOW SNOW_SCHEMA=V_TEST ./main-0.sh
+
+Or without the script:
+
+   SNOW_CONNECTION=<<your-snowflake-connection-name>> uv run main-1.py
+
+
+ENVIRONMENT VARIABLES (z_config.py)
+-----------------------------------
+   SNOW_CONNECTION   Profile name in ~/.snowflake/connections.toml. If set, the
+                     three variables below are NOT needed (local mode).
+   SNOW_ACCOUNT      Required only when SNOW_CONNECTION is not set (Lambda mode).
+   SNOW_USER         Same.
+   SNOW_PASS         Same.
+   SNOW_WAREHOUSE    Optional. Unset = use the profile's warehouse.
+   SNOW_ROLE         Optional. Unset = use the profile's role.
+   SNOW_DATABASE     Optional. Default BR_DB.
+   SNOW_SCHEMA       Optional. Default BR_ORDERS.
+   PRIVATE_KEY_PASSPHRASE / SNOWSQL_PRIVATE_KEY_PASSPHRASE
+                     Passphrase for an encrypted private key (profile mode only).
+
+Any non-empty SNOW_WAREHOUSE / SNOW_ROLE / SNOW_DATABASE / SNOW_SCHEMA value
+overrides what the profile specifies.
+
+
+TROUBLESHOOTING
+---------------
+"ERROR: no Snowflake connection is configured.
+ SNOW_CONNECTION is not set, and the Lambda-mode variable 'SNOW_ACCOUNT' is missing too."
+    SNOW_CONNECTION is not exported in this shell. Local fix:
+      1. Add to ~/.bashrc (profile name from 'snow connection list'):
+             export SNOW_CONNECTION="<<your-snowflake-connection-name>>"
+      2. Open a new terminal (or run: source ~/.bashrc), then run again.
+    One-off alternative:  SNOW_CONNECTION=<<your-snowflake-connection-name>> ./main-0.sh
+    In the Lambda, SNOW_CONNECTION is not used; set SNOW_ACCOUNT, SNOW_USER and
+    SNOW_PASS as environment variables on the function.
+
+"Password was not given but private key is encrypted"
+    The passphrase variable is not exported in this shell (see prerequisite 3).
+
+"Expected bytes, RSAPrivateKey ... got NoneType"
+    The profile has no private_key_path (or the connector could not find it).
+    Check the profile with: snow connection list
+
+"Object does not exist or not authorized" / SQL compilation error
+    The role cannot see BR_DB.BR_ORDERS.customers, or the table has not been
+    created. Check SNOW_ROLE / SNOW_DATABASE / SNOW_SCHEMA.
+
+ModuleNotFoundError: No module named 'snowflake'
+    Run through uv ('uv run ...' or './main-0.sh'), not the system python.
+
+
+DOCKER (Lambda image)
+---------------------
+The image is built from public.ecr.aws/lambda/python:3.14 and installs
+dependencies from uv.lock:
+
+   docker build -t lambda-image-snowflake-connector-template .
+
+In the Lambda, SNOW_CONNECTION is not set, so the function uses SNOW_ACCOUNT,
+SNOW_USER and SNOW_PASS from its environment variables. Local profiles and the
+passphrase variable are not used there.
