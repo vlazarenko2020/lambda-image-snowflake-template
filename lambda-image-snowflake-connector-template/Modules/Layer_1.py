@@ -8,7 +8,7 @@ import snowflake.connector
 from cryptography.hazmat.primitives import serialization
 from snowflake.connector import ProgrammingError
 
-from z_config import *
+from .Layer_z_config import *
 
 
 # --- The 'snow' CLI profile uses 'private_key_path'; the Python connector expects
@@ -36,39 +36,43 @@ def f_key_pair_overrides(f_connection_name):
 
 def f_connect_to_snow():
 
-    # -- info is taken from "from z_config import *"
+    # -- info is taken from "from .Layer_z_config import *"
     # -- Only non-empty overrides are passed, so a profile keeps its own warehouse/role.
-    overrides = {k: v for k, v in {
-        'warehouse': z_warehouse,
-        'database':  z_database,
-        'schema':    z_schema,
-        'role':      z_role,
-    }.items() if v}
+    overrides = {}
+    if z_snowflake_warehouse:
+        overrides['warehouse'] = z_snowflake_warehouse
+    if z_snowflake_database:
+        overrides['database'] = z_snowflake_database
+    if z_snowflake_schema:
+        overrides['schema'] = z_snowflake_schema
+    if z_snowflake_role:
+        overrides['role'] = z_snowflake_role
 
-    if z_connection:
-        print(f'snow_connection: {z_connection}')
-        overrides.update(f_key_pair_overrides(z_connection))
-        return snowflake.connector.connect(connection_name=z_connection, **overrides)
+    if z_snowflake_connection:
+        print(f'snow_connection: {z_snowflake_connection}')
+        overrides.update(f_key_pair_overrides(z_snowflake_connection))
+        return snowflake.connector.connect(connection_name=z_snowflake_connection, **overrides)
 
     # -- Key-pair auth (service user): key from a file path, or PEM text from an env var.
-    if z_private_key_path:
-        overrides['private_key_file'] = os.path.expanduser(z_private_key_path)
-        if z_key_passphrase:
-            overrides['private_key_file_pwd'] = z_key_passphrase
+    if z_snowflake_private_key_path:
+        overrides['private_key_file'] = os.path.expanduser(z_snowflake_private_key_path)
+        if z_snowflake_private_key_passphrase:
+            overrides['private_key_file_pwd'] = z_snowflake_private_key_passphrase
     else:
         # -- env vars often flatten newlines into a literal "\n"
-        pem = z_private_key.replace('\\n', '\n').encode()
-        key = serialization.load_pem_private_key(
-            pem,
-            password=z_key_passphrase.encode() if z_key_passphrase else None)
+        pem = z_snowflake_private_key.replace('\\n', '\n').encode()
+        key_password = None
+        if z_snowflake_private_key_passphrase:
+            key_password = z_snowflake_private_key_passphrase.encode()
+        key = serialization.load_pem_private_key(pem, password=key_password)
         overrides['private_key'] = key.private_bytes(
             encoding=serialization.Encoding.DER,
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption())
 
     return snowflake.connector.connect(
-        user=z_user,
-        account=z_account,
+        user=z_snowflake_user,
+        account=z_snowflake_account,
         **overrides
     )
 # ---------------------------------------------------------------------------------------------
@@ -85,7 +89,10 @@ def f_run_snowflake_sql(f_conn,
 
         print('\nTable Data:\n')
         for row in cur:
-            print(', '.join(str(col) for col in row))
+            cols = []
+            for col in row:
+                cols.append(str(col))
+            print(', '.join(cols))
         print('--\n')
 
 

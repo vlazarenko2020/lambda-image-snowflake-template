@@ -17,7 +17,7 @@ RUN cd ${LAMBDA_TASK_ROOT} \
     && rm /tmp/requirements.txt
 
 # Copy function code
-COPY lambda_function.py z_config.py ${LAMBDA_TASK_ROOT}/
+COPY lambda_function.py ${LAMBDA_TASK_ROOT}/
 COPY Modules/*.py ${LAMBDA_TASK_ROOT}/Modules/
 
 # Handler: <module>.<function>

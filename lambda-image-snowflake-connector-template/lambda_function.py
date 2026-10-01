@@ -4,7 +4,7 @@ from datetime import datetime
 from Modules import f_connect_to_snow
 from Modules import f_run_snowflake_sql
 
-from z_config import *
+from Modules.Layer_z_config import *
 
 
 cur_date_str = datetime.now().strftime("%Y-%m-%d__%H_%M")
@@ -23,7 +23,7 @@ def lambda_handler(event,context):
             address,
             create_at,
             binary_score
-        FROM {z_database}.{z_schema}.customers
+        FROM {z_snowflake_database}.{z_snowflake_schema}.customers
         ORDER BY customer_id
         LIMIT 10;
     """

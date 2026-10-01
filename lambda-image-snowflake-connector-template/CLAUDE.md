@@ -24,9 +24,9 @@ snow connection test -c <<your-snowflake-connection-name>>
 
 Call flow: `main-1.py` → `lambda_function.lambda_handler` → `Modules.f_connect_to_snow()` / `Modules.f_run_snowflake_sql()`.
 
-- `z_config.py` runs at import time and picks one of three auth modes from env vars (first match wins):
-  - **Local:** `SNOW_CONNECTION` names a profile in `~/.snowflake/connections.toml`.
-  - **Parameter Store (preferred for Lambda):** `SNOW_SSM_PREFIX` (e.g. `/snowflake/TEST/`). `f_read_ssm_parameters()` reads every parameter directly under it with decryption: `snowflake_account`, `snowflake_user`, `snowflake_private_key` (SecureString, PEM text), `snowflake_private_key_passphrase` (SecureString, only if encrypted), optional `snowflake_warehouse` / `snowflake_role` / `snowflake_database` / `snowflake_schema`. Parameter Store wins over the plain env vars for the connection values; for the optional overrides the env var wins. Needs `ssm:GetParametersByPath` (+ `kms:Decrypt` for a customer managed key). `boto3` is a declared dependency; AWS errors print a how-to-fix message and `exit()`. Ignored in profile mode.
+- `Modules/Layer_z_config.py` runs at import time (imported by `Layer_1.py` as `.Layer_z_config` and by `lambda_function.py` as `Modules.Layer_z_config`). `z_does_code_run_in_lambda` (true when `AWS_LAMBDA_FUNCTION_NAME` is set) tells Lambda from CLI. `f_process_error_and_exit()` reports config problems: it raises `RuntimeError` in Lambda (visible in CloudWatch) and prints + `exit()`s on the CLI. `SNOW_CONNECTION` set in Lambda is an error (no `~/.snowflake` there). It picks one of three auth modes from env vars (first match wins):
+  - **Local (CLI only):** `SNOW_CONNECTION` names a profile in `~/.snowflake/connections.toml`.
+  - **Parameter Store (preferred for Lambda):** `PARAMETER_STORE_ENTRIES_PREFIX_FOR_SNOWFLAKE_CONNECTION` (e.g. `/snowflake/TEST/`). `f_read_ssm_parameters()` reads every parameter directly under it with decryption: `snowflake_account`, `snowflake_user`, `snowflake_private_key` (SecureString, PEM text), `snowflake_private_key_passphrase` (SecureString, only if encrypted), optional `snowflake_warehouse` / `snowflake_role` / `snowflake_database` / `snowflake_schema`. Parameter Store wins over the plain env vars for the connection values; for the optional overrides the env var wins. Needs `ssm:GetParametersByPath` (+ `kms:Decrypt` for a customer managed key). `boto3` is a declared dependency; AWS errors print a how-to-fix message and `exit()`. Ignored in profile mode.
   - **Lambda env vars (key-pair, service user; no password mode):** `SNOW_ACCOUNT`, `SNOW_USER`, and one of `SNOW_PRIVATE_KEY_PATH` (file) / `SNOW_PRIVATE_KEY` (PEM text), plus `SNOW_PRIVATE_KEY_PASSPHRASE` if the key is encrypted (`PRIVATE_KEY_PASSPHRASE` / `SNOWSQL_PRIVATE_KEY_PASSPHRASE` also accepted). It lists every missing variable and calls `exit()` if the set is incomplete and `SNOW_CONNECTION` is unset.
   - Optional overrides `SNOW_WAREHOUSE` and `SNOW_ROLE` (unset: the profile's values apply), and `SNOW_DATABASE` / `SNOW_SCHEMA` (default `BR_DB` / `BR_ORDERS`, which override the profile's).
 - `Modules/__init__.py` re-exports `Modules/Layer_1.py` via `import *`.
@@ -36,7 +36,7 @@ Call flow: `main-1.py` → `lambda_function.lambda_handler` → `Modules.f_conne
 
 ## Docker
 
-`Dockerfile` is based on `public.ecr.aws/lambda/python:3.14`. It copies in the `uv` binary, runs `uv export --frozen --no-dev` and `uv pip install --system` into `/var/lang`, then copies `lambda_function.py`, `z_config.py` and `Modules/`. Keep `requires-python` (`>=3.14,<3.15`), `.python-version` and the image tag on the same Python version. Lambda uses the env-var mode; profiles and the passphrase variable do not exist there.
+`Dockerfile` is based on `public.ecr.aws/lambda/python:3.14`. It copies in the `uv` binary, runs `uv export --frozen --no-dev` and `uv pip install --system` into `/var/lang`, then copies `lambda_function.py` and `Modules/` (which includes `Layer_z_config.py`). Keep `requires-python` (`>=3.14,<3.15`), `.python-version` and the image tag on the same Python version. Lambda uses the env-var mode; profiles and the passphrase variable do not exist there.
 
 ## Conventions and gotchas
 

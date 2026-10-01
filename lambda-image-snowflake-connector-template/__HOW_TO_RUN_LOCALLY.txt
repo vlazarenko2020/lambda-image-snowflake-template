@@ -9,7 +9,7 @@ first 10 rows of <SNOW_DATABASE>.<SNOW_SCHEMA>.customers
 
 Call flow: main-1.py -> lambda_function.lambda_handler
            -> Modules/Layer_1.py: f_connect_to_snow(), f_run_snowflake_sql()
-Settings are read in z_config.py from environment variables.
+Settings are read in Modules/Layer_z_config.py from environment variables.
 
 
 PREREQUISITES
@@ -72,11 +72,14 @@ Or without the script:
    SNOW_CONNECTION=<<your-snowflake-connection-name>> uv run main-1.py
 
 
-ENVIRONMENT VARIABLES (z_config.py)
------------------------------------
+ENVIRONMENT VARIABLES (Modules/Layer_z_config.py)
+-------------------------------------------------
    SNOW_CONNECTION   Profile name in ~/.snowflake/connections.toml. If set, the
                      key-pair variables below are NOT needed (local mode).
-   SNOW_SSM_PREFIX   Parameter Store path prefix, e.g. /snowflake/TEST/. Used when
+                     NOT allowed in Lambda: if set there, the function fails with
+                     an error asking you to remove it.
+   PARAMETER_STORE_ENTRIES_PREFIX_FOR_SNOWFLAKE_CONNECTION
+                     Parameter Store path prefix, e.g. /snowflake/TEST/. Used when
                      SNOW_CONNECTION is not set. Reads the parameters snowflake_account,
                      snowflake_user, snowflake_private_key (SecureString, PEM text),
                      snowflake_private_key_passphrase (SecureString, only if the key
@@ -87,7 +90,7 @@ ENVIRONMENT VARIABLES (z_config.py)
                      win over Parameter Store. Needs AWS credentials locally
                      (AWS_PROFILE / ~/.aws) or the execution role in Lambda, with
                      ssm:GetParametersByPath (and kms:Decrypt for a customer managed key).
-   SNOW_ACCOUNT      Required only when neither SNOW_CONNECTION nor SNOW_SSM_PREFIX
+   SNOW_ACCOUNT      Required only when neither SNOW_CONNECTION nor PARAMETER_STORE_ENTRIES_PREFIX_FOR_SNOWFLAKE_CONNECTION
                      provides it (Lambda mode).
    SNOW_USER         Same (service user).
    SNOW_PRIVATE_KEY_PATH
@@ -120,7 +123,7 @@ TROUBLESHOOTING
              export SNOW_CONNECTION="<<your-snowflake-connection-name>>"
       2. Open a new terminal (or run: source ~/.bashrc), then run again.
     One-off alternative:  SNOW_CONNECTION=<<your-snowflake-connection-name>> ./main-0.sh
-    In the Lambda, SNOW_CONNECTION is not used; set SNOW_SSM_PREFIX and create the
+    In the Lambda, SNOW_CONNECTION is not used; set PARAMETER_STORE_ENTRIES_PREFIX_FOR_SNOWFLAKE_CONNECTION and create the
     Parameter Store parameters, or set SNOW_ACCOUNT, SNOW_USER and
     SNOW_PRIVATE_KEY (or SNOW_PRIVATE_KEY_PATH) as environment variables on the
     function, plus SNOW_PRIVATE_KEY_PASSPHRASE if the key is encrypted.
@@ -128,6 +131,12 @@ TROUBLESHOOTING
 "ERROR: could not read Snowflake connection info from Parameter Store path ..."
     AWS credentials/region are missing, or the role lacks ssm:GetParametersByPath
     (or kms:Decrypt). Check AWS_PROFILE locally, or the Lambda execution role.
+
+"ERROR: SNOW_CONNECTION is not allowed in AWS Lambda."
+    SNOW_CONNECTION is set on the Lambda function. Remove it from the function's
+    environment variables and use Parameter Store (PARAMETER_STORE_ENTRIES_PREFIX_FOR_SNOWFLAKE_CONNECTION) or the
+    SNOW_ACCOUNT / SNOW_USER / SNOW_PRIVATE_KEY variables instead. (The code knows it
+    runs in Lambda from the AWS_LAMBDA_FUNCTION_NAME variable.)
 
 "Password was not given but private key is encrypted"
     The passphrase variable is not exported in this shell (see prerequisite 3).
@@ -152,7 +161,7 @@ dependencies from uv.lock:
    docker build -t lambda-image-snowflake-connector-template .
 
 In the Lambda, SNOW_CONNECTION is not set, so the function uses key-pair
-authentication (service user). Preferred: set SNOW_SSM_PREFIX and let the function
+authentication (service user). Preferred: set PARAMETER_STORE_ENTRIES_PREFIX_FOR_SNOWFLAKE_CONNECTION and let the function
 read the parameters from Parameter Store (execution role needs
 ssm:GetParametersByPath, plus kms:Decrypt for a customer managed key).
 Alternative, environment variables: SNOW_ACCOUNT,

@@ -1,7 +1,7 @@
 # -- Parameter Store mode (parameters: snowflake_account, snowflake_user, snowflake_private_key,
 # -- snowflake_private_key_passphrase, optional snowflake_warehouse/_role/_database/_schema).
 # -- Then the variables below are not needed:
-export SNOW_SSM_PREFIX=/snowflake/TEST/
+export PARAMETER_STORE_ENTRIES_PREFIX_FOR_SNOWFLAKE_CONNECTION=/snowflake/TEST/
 
 # -- Environment variable mode:
 export SNOW_ACCOUNT=
