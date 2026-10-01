@@ -1,4 +1,8 @@
 export SNOW_ACCOUNT=
 export SNOW_USER=
-export SNOW_PASS=
+# -- one of the two:
+export SNOW_PRIVATE_KEY_PATH=
+export SNOW_PRIVATE_KEY=
+# -- only if the key is encrypted:
+export SNOW_PRIVATE_KEY_PASSPHRASE=
 

@@ -23,7 +23,7 @@ def lambda_handler(event,context):
             address,
             create_at,
             binary_score
-        FROM {my_database}.{my_schema}.customers
+        FROM {z_database}.{z_schema}.customers
         ORDER BY customer_id
         LIMIT 10;
     """

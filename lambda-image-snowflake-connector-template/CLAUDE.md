@@ -26,10 +26,10 @@ Call flow: `main-1.py` → `lambda_function.lambda_handler` → `Modules.f_conne
 
 - `z_config.py` runs at import time and picks one of two auth modes from env vars:
   - **Local:** `SNOW_CONNECTION` names a profile in `~/.snowflake/connections.toml`.
-  - **Lambda:** `SNOW_ACCOUNT` / `SNOW_USER` / `SNOW_PASS` (it calls `exit()` if they are missing and `SNOW_CONNECTION` is unset).
+  - **Lambda (key-pair, service user; no password mode):** `SNOW_ACCOUNT`, `SNOW_USER`, and one of `SNOW_PRIVATE_KEY_PATH` (file) / `SNOW_PRIVATE_KEY` (PEM text), plus `SNOW_PRIVATE_KEY_PASSPHRASE` if the key is encrypted (`PRIVATE_KEY_PASSPHRASE` / `SNOWSQL_PRIVATE_KEY_PASSPHRASE` also accepted). It lists every missing variable and calls `exit()` if the set is incomplete and `SNOW_CONNECTION` is unset.
   - Optional overrides `SNOW_WAREHOUSE` and `SNOW_ROLE` (unset: the profile's values apply), and `SNOW_DATABASE` / `SNOW_SCHEMA` (default `BR_DB` / `BR_ORDERS`, which override the profile's).
 - `Modules/__init__.py` re-exports `Modules/Layer_1.py` via `import *`.
-- `Layer_1.f_connect_to_snow()` uses `connect(connection_name=...)` in profile mode. `f_key_pair_overrides()` is needed because the `snow` CLI profile uses `private_key_path` while the Python connector wants `private_key_file`, and the connector does not read the key passphrase from the environment (it takes `PRIVATE_KEY_PASSPHRASE` or `SNOWSQL_PRIVATE_KEY_PASSPHRASE`).
+- `Layer_1.f_connect_to_snow()` uses `connect(connection_name=...)` in profile mode. `f_key_pair_overrides()` is needed because the `snow` CLI profile uses `private_key_path` while the Python connector wants `private_key_file`, and the connector does not read the key passphrase from the environment (it takes `PRIVATE_KEY_PASSPHRASE` or `SNOWSQL_PRIVATE_KEY_PASSPHRASE`). In env-var mode it passes `private_key_file` + `private_key_file_pwd` for a key path, or loads the PEM text with `cryptography` and passes DER bytes as `private_key` (literal `\n` in the PEM is converted to newlines).
 - `Layer_1.f_run_snowflake_sql()` prints all returned columns and returns a success bool; it only catches `ProgrammingError`.
 - Table `BR_DB.BR_ORDERS.customers` (customer_id, first_name, last_name, email, address VARIANT, create_at, binary_score) holds 1000 synthetic rows created for testing.
 

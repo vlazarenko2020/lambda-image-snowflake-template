@@ -75,16 +75,24 @@ Or without the script:
 ENVIRONMENT VARIABLES (z_config.py)
 -----------------------------------
    SNOW_CONNECTION   Profile name in ~/.snowflake/connections.toml. If set, the
-                     three variables below are NOT needed (local mode).
+                     key-pair variables below are NOT needed (local mode).
    SNOW_ACCOUNT      Required only when SNOW_CONNECTION is not set (Lambda mode).
-   SNOW_USER         Same.
-   SNOW_PASS         Same.
+   SNOW_USER         Same (service user).
+   SNOW_PRIVATE_KEY_PATH
+                     Same: path to the PEM private key file. Use this OR
+                     SNOW_PRIVATE_KEY.
+   SNOW_PRIVATE_KEY  Same: PEM text of the private key (suits Lambda, where
+                     there is no key file). Literal "\n" is accepted as newline.
+   SNOW_PRIVATE_KEY_PASSPHRASE
+                     Passphrase, only if the key is encrypted (Lambda mode).
    SNOW_WAREHOUSE    Optional. Unset = use the profile's warehouse.
    SNOW_ROLE         Optional. Unset = use the profile's role.
    SNOW_DATABASE     Optional. Default BR_DB.
    SNOW_SCHEMA       Optional. Default BR_ORDERS.
    PRIVATE_KEY_PASSPHRASE / SNOWSQL_PRIVATE_KEY_PASSPHRASE
-                     Passphrase for an encrypted private key (profile mode only).
+                     Passphrase for an encrypted private key (profile mode; in
+                     Lambda mode they are also accepted as a fallback for
+                     SNOW_PRIVATE_KEY_PASSPHRASE).
 
 Any non-empty SNOW_WAREHOUSE / SNOW_ROLE / SNOW_DATABASE / SNOW_SCHEMA value
 overrides what the profile specifies.
@@ -93,14 +101,16 @@ overrides what the profile specifies.
 TROUBLESHOOTING
 ---------------
 "ERROR: no Snowflake connection is configured.
- SNOW_CONNECTION is not set, and the Lambda-mode variable 'SNOW_ACCOUNT' is missing too."
+ Environment variable SNOW_CONNECTION is not set and the key-pair variables are
+ incomplete. Missing: SNOW_ACCOUNT, SNOW_USER, SNOW_PRIVATE_KEY_PATH or SNOW_PRIVATE_KEY"
     SNOW_CONNECTION is not exported in this shell. Local fix:
       1. Add to ~/.bashrc (profile name from 'snow connection list'):
              export SNOW_CONNECTION="<<your-snowflake-connection-name>>"
       2. Open a new terminal (or run: source ~/.bashrc), then run again.
     One-off alternative:  SNOW_CONNECTION=<<your-snowflake-connection-name>> ./main-0.sh
     In the Lambda, SNOW_CONNECTION is not used; set SNOW_ACCOUNT, SNOW_USER and
-    SNOW_PASS as environment variables on the function.
+    SNOW_PRIVATE_KEY (or SNOW_PRIVATE_KEY_PATH) as environment variables on the
+    function, plus SNOW_PRIVATE_KEY_PASSPHRASE if the key is encrypted.
 
 "Password was not given but private key is encrypted"
     The passphrase variable is not exported in this shell (see prerequisite 3).
@@ -124,6 +134,8 @@ dependencies from uv.lock:
 
    docker build -t lambda-image-snowflake-connector-template .
 
-In the Lambda, SNOW_CONNECTION is not set, so the function uses SNOW_ACCOUNT,
-SNOW_USER and SNOW_PASS from its environment variables. Local profiles and the
-passphrase variable are not used there.
+In the Lambda, SNOW_CONNECTION is not set, so the function uses key-pair
+authentication (service user) from its environment variables: SNOW_ACCOUNT,
+SNOW_USER, SNOW_PRIVATE_KEY (PEM text) or SNOW_PRIVATE_KEY_PATH, and
+SNOW_PRIVATE_KEY_PASSPHRASE if the key is encrypted. Local profiles are not
+available there. Password authentication is not supported.
