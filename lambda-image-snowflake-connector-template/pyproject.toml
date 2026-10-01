@@ -4,4 +4,4 @@ version = "0.1.0"
 description = "Template AWS Lambda container image (Python 3.14, built with uv) that queries Snowflake using snowflake-connector-python."
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
-dependencies = ["snowflake-connector-python"]
+dependencies = ["snowflake-connector-python", "boto3"]

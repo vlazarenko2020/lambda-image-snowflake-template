@@ -227,11 +227,15 @@ name = "lambda-image-snowflake-connector-template"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "boto3" },
     { name = "snowflake-connector-python" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "snowflake-connector-python" }]
+requires-dist = [
+    { name = "boto3" },
+    { name = "snowflake-connector-python" },
+]
 
 [[package]]
 name = "packaging"
